@@ -61,14 +61,20 @@ const AdaBinSim = ({ isActive }) => {
         let animId, w, h;
         
         const handleResize = () => {
-            const rect = canvas.getBoundingClientRect();
-            if (rect.width === 0 || rect.height === 0) return;
+            // Fix: Use clientWidth/Height to get the logical layout size (e.g., 800px)
+            // instead of getBoundingClientRect() which returns the visually scaled size (e.g., 375px).
+            // This ensures the canvas resolution and internal coordinate system remain consistent
+            // regardless of the CSS transform scale applied by the parent.
+            const wLogical = canvas.clientWidth;
+            const hLogical = canvas.clientHeight;
+            
+            if (!wLogical || !hLogical) return;
             
             const dpr = window.devicePixelRatio || 1;
-            w = rect.width; 
-            h = rect.height;
+            w = wLogical; 
+            h = hLogical;
             
-            // Only update canvas buffer size if it changed to avoid flickering
+            // Only update canvas buffer size if it changed
             if (canvas.width !== w * dpr || canvas.height !== h * dpr) {
                 canvas.width = w * dpr; 
                 canvas.height = h * dpr;

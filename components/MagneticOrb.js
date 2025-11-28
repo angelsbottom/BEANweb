@@ -66,8 +66,9 @@ const MagneticOrb = () => {
             const dy = mouse.current.y - pos.current.y;
             
             // Apply smoothing (spring-like follow)
-            const vx = dx * 0.15;
-            const vy = dy * 0.15;
+            // Increased from 0.15 to 0.25 for better responsiveness (User Request)
+            const vx = dx * 0.25;
+            const vy = dy * 0.25;
             
             pos.current.x += vx;
             pos.current.y += vy;
@@ -217,11 +218,27 @@ const MagneticOrb = () => {
             requestAnimationFrame(loop);
         };
 
+        const handleTouchMove = (e) => {
+            if (e.touches.length > 0) {
+                // Use the first touch point
+                handleMouseMove({ 
+                    clientX: e.touches[0].clientX, 
+                    clientY: e.touches[0].clientY,
+                    target: document.elementFromPoint(e.touches[0].clientX, e.touches[0].clientY) || e.target
+                });
+            }
+        };
+
         window.addEventListener('mousemove', handleMouseMove);
+        window.addEventListener('touchmove', handleTouchMove, { passive: true });
+        window.addEventListener('touchstart', handleTouchMove, { passive: true });
+        
         const frameId = requestAnimationFrame(loop);
         
         return () => { 
             window.removeEventListener('mousemove', handleMouseMove); 
+            window.removeEventListener('touchmove', handleTouchMove);
+            window.removeEventListener('touchstart', handleTouchMove);
             cancelAnimationFrame(frameId); 
         };
     }, []);

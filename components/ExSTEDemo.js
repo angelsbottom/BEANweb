@@ -16,14 +16,14 @@ const ExSTEDemo = () => {
     // Update ref on render
     exponentRef.current = exponent;
 
-    // Mouse Move to calculate proximity speed
-    const handleMouseMove = (e) => {
+    // Mouse/Touch Move to calculate proximity speed
+    const handleMove = (clientX, clientY) => {
         if (!sliderRef.current) return;
         const rect = sliderRef.current.getBoundingClientRect();
         const centerX = rect.left + rect.width / 2;
         const centerY = rect.top + rect.height / 2;
         
-        const dist = Math.sqrt(Math.pow(e.clientX - centerX, 2) + Math.pow(e.clientY - centerY, 2));
+        const dist = Math.sqrt(Math.pow(clientX - centerX, 2) + Math.pow(clientY - centerY, 2));
         
         // Distance thresholds
         const maxDist = 300; // Full speed at 300px+
@@ -33,6 +33,14 @@ const ExSTEDemo = () => {
         factor = Math.max(0, Math.min(1, factor));
         
         speedFactor.current = factor;
+    };
+
+    const handleMouseMove = (e) => handleMove(e.clientX, e.clientY);
+    
+    const handleTouchMove = (e) => {
+        if (e.touches && e.touches.length > 0) {
+            handleMove(e.touches[0].clientX, e.touches[0].clientY);
+        }
     };
 
     // Auto-Animation Effect
@@ -111,10 +119,15 @@ const ExSTEDemo = () => {
         const canvas = canvasRef.current;
         const ctx = canvas.getContext('2d');
         const dpr = window.devicePixelRatio || 1;
-        const rect = canvas.getBoundingClientRect();
-        canvas.width = rect.width * dpr; canvas.height = rect.height * dpr;
+        
+        // Fix: Use clientWidth/Height for logical size
+        const w = canvas.clientWidth;
+        const h = canvas.clientHeight;
+        
+        canvas.width = w * dpr; 
+        canvas.height = h * dpr;
         ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
-        const w = rect.width; const h = rect.height;
+        
         ctx.clearRect(0,0,w,h);
         // User requested range 10^[-2, 1]
         const o = Math.pow(10, exponent); 
@@ -176,6 +189,7 @@ const ExSTEDemo = () => {
         <div 
             className="flex flex-col items-center w-full h-full gap-6"
             onMouseMove={handleMouseMove}
+            onTouchMove={handleTouchMove}
         >
             {/* Local Filter for Thumb Distortion - Tuned for small size */}
             <svg style={{ display: 'none' }}>

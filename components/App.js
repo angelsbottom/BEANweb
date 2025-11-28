@@ -10,6 +10,8 @@ const Latex = ({ children, displayMode = false }) => {
     return <span dangerouslySetInnerHTML={{ __html: html }} />;
 };
 
+const MOBILE_TARGET_WIDTH = 800;
+
 const pages = [
     { 
         id:'intro', 
@@ -133,6 +135,7 @@ const useScale = () => {
     const [scale, setScale] = useState(1);
     const [visualScale, setVisualScale] = useState(1);
     const [textScale, setTextScale] = useState(1);
+    const [mobileScale, setMobileScale] = useState(1);
 
     useEffect(() => {
         const handleResize = () => {
@@ -143,7 +146,21 @@ const useScale = () => {
                 setScale(1);
                 setVisualScale(1);
                 setTextScale(1);
+
+                // Mobile Scaling: Ensure content fits in narrow screens
+                // Use a larger virtual width to maintain the spacious desktop layout,
+                // then scale the entire container down to fit the mobile screen.
+                const targetWidth = MOBILE_TARGET_WIDTH; 
+                const padding = 80; 
+                const availableWidth = window.innerWidth - padding;
+                
+                if (availableWidth < targetWidth) {
+                    setMobileScale(availableWidth / targetWidth);
+                } else {
+                    setMobileScale(1);
+                }
             } else {
+                setMobileScale(1);
                 // Scale based on 1440px width for landscape
                 const s = window.innerWidth / 1440;
                 setScale(s);
@@ -173,11 +190,11 @@ const useScale = () => {
         handleResize();
         return () => window.removeEventListener('resize', handleResize);
     }, []);
-    return { scale, visualScale, textScale };
+    return { scale, visualScale, textScale, mobileScale };
 };
 
 const App = () => {
-    const { scale, visualScale, textScale } = useScale();
+    const { scale, visualScale, textScale, mobileScale } = useScale();
     const [curr, setCurr] = useState(0);
     const [anim, setAnim] = useState(false);
     // State to track layout mode
@@ -233,20 +250,39 @@ const App = () => {
                             onMouseMove={(e) => {
                                 if (!navRef.current) return;
                                 const rect = navRef.current.getBoundingClientRect();
-                                // Adjust rect width for scale
                                 const rectWidth = rect.width / scale;
                                 const rectLeft = rect.left / scale;
-                                
-                                // Mouse X in container coords
                                 const mouseX = e.clientX / scale;
-                                
+                                const x = mouseX - rectLeft;
+                                const idx = Math.min(Math.max(Math.floor((x / rectWidth) * pages.length), 0), pages.length - 1);
+                                setNavHover(idx);
+                            }}
+                            onTouchMove={(e) => {
+                                if (!navRef.current || !e.touches[0]) return;
+                                const rect = navRef.current.getBoundingClientRect();
+                                const rectWidth = rect.width / scale;
+                                const rectLeft = rect.left / scale;
+                                const mouseX = e.touches[0].clientX / scale;
                                 const x = mouseX - rectLeft;
                                 const idx = Math.min(Math.max(Math.floor((x / rectWidth) * pages.length), 0), pages.length - 1);
                                 setNavHover(idx);
                             }}
                             onMouseLeave={() => setNavHover(null)}
-                            onClick={() => {
+                            onTouchEnd={() => {
+                                // Optional: trigger navigation on touch end if we want drag-to-select
                                 if (navHover !== null && navHover !== curr) go(navHover);
+                                setNavHover(null);
+                            }}
+                            onClick={(e) => {
+                                // Robust click handling for both mouse and touch (if touch didn't trigger move)
+                                if (!navRef.current) return;
+                                const rect = navRef.current.getBoundingClientRect();
+                                const rectWidth = rect.width / scale;
+                                const rectLeft = rect.left / scale;
+                                const mouseX = e.clientX / scale;
+                                const x = mouseX - rectLeft;
+                                const idx = Math.min(Math.max(Math.floor((x / rectWidth) * pages.length), 0), pages.length - 1);
+                                if (idx !== curr) go(idx);
                             }}
                         >
                             {pages.map((_,i)=>(
@@ -286,8 +322,8 @@ const App = () => {
                         </div>
 
                     {/* Visual Section */}
-                        <div className={`relative flex transition-all duration-500 ${isLandscape ? 'justify-end items-start flex-1 pl-4 h-full pt-4' : 'justify-center items-start w-full min-h-[50vh]'}`}>
-                                <div className={`w-full rounded-3xl p-1 shadow-2xl transition-all duration-700 ease-[cubic-bezier(0.23,1,0.32,1)] transform flex flex-col border border-white/10
+                        <div className={`relative flex transition-all duration-500 ${isLandscape ? 'justify-end items-start flex-1 pl-4 h-full pt-4' : 'justify-center items-center w-full min-h-[50vh] overflow-hidden'}`}>
+                                <div className={`w-full rounded-3xl p-1 shadow-2xl transition-all duration-700 ease-[cubic-bezier(0.23,1,0.32,1)] transform flex flex-col border border-white/10 flex-shrink-0
                                     ${anim?'opacity-0 scale-95 translate-x-20':'opacity-100 scale-100 translate-x-0'}
                                     ${curr === 0 ? 'aspect-[4/3] min-h-[600px]' : 'min-h-[50vh]'}
                                 `}
@@ -295,8 +331,9 @@ const App = () => {
                                     backdropFilter: 'blur(20px)',
                                     WebkitBackdropFilter: 'blur(20px)',
                                     backgroundColor: 'rgba(20, 20, 30, 0.4)',
-                                    transform: `scale(${visualScale})`,
-                                    transformOrigin: 'top right'
+                                    transform: isLandscape ? `scale(${visualScale})` : `scale(${mobileScale})`,
+                                    transformOrigin: isLandscape ? 'top right' : 'top center',
+                                    width: (!isLandscape && mobileScale < 1) ? `${MOBILE_TARGET_WIDTH}px` : '100%'
                                 }}
                                 >
                                     <div className="w-full flex-1 rounded-2xl overflow-hidden relative flex flex-col">
@@ -305,7 +342,6 @@ const App = () => {
                                         </div>
                                     </div>
                                     
-
                                 </div>
                         </div>
                     </div>
