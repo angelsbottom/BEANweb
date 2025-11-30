@@ -70,8 +70,8 @@ const NeuralBackground = () => {
 
                 if (dist < interactDist) {
                     const force = (interactDist - dist) / interactDist;
-                    interactX = -dx * force * 0.05;
-                    interactY = -dy * force * 0.05;
+                    interactX = -dx * force * 0.2;
+                    interactY = -dy * force * 0.2;
                 }
 
                 const targetX = wanderX + interactX;
@@ -104,12 +104,13 @@ const NeuralBackground = () => {
                 this.y = Math.random() * height;
                 this.vx = (Math.random() - 0.5) * 0.05; // Much slower initial
                 this.vy = (Math.random() - 0.5) * 0.05;
-                this.size = Math.random() * 2.5 + 0.5; // Random size 0.5 - 3.0
+                this.size = Math.random() * 4.0 + 0.5; // Random size 0.5 - 4.5 (Increased range)
                 this.color = DUST_COLORS[Math.floor(Math.random() * DUST_COLORS.length)];
                 this.baseAlpha = Math.random() * 0.4 + 0.2;
                 this.alpha = this.baseAlpha;
                 this.pulseSpeed = Math.random() * 0.03 + 0.02; // Faster pulse for twinkle
                 this.pulseTheta = Math.random() * Math.PI * 2;
+                this.attractTimer = 0; // Track attraction duration
             }
 
             update(mouse) {
@@ -127,25 +128,48 @@ const NeuralBackground = () => {
                 this.pulseTheta += this.pulseSpeed;
                 this.alpha = this.baseAlpha + Math.sin(this.pulseTheta) * 0.15;
 
-                // 3. Mouse Repulsion (Extremely Subtle)
-                let dx = this.x - mouse.x;
-                let dy = this.y - mouse.y;
-                let dist = Math.sqrt(dx * dx + dy * dy);
-                const interactDist = 100;
+                // 3. Section Attraction (Border + Timeout)
+                const capsule = document.querySelector('.liquid-glass-capsule');
+                if (capsule) {
+                    const rect = capsule.getBoundingClientRect();
+                    
+                    // Find nearest point on the rectangle (border/surface)
+                    const nearestX = Math.max(rect.left, Math.min(this.x, rect.right));
+                    const nearestY = Math.max(rect.top, Math.min(this.y, rect.bottom));
+                    
+                    let dx = nearestX - this.x;
+                    let dy = nearestY - this.y;
+                    let dist = Math.sqrt(dx * dx + dy * dy);
+                    
+                    // Attraction range
+                    const attractRange = 120; // Reduced from 200
+                    
+                    if (dist < attractRange) {
+                        // Increment timer (assuming ~60fps, 1/60 per frame)
+                        this.attractTimer += 0.016;
 
-                if (dist < interactDist) {
-                    const force = (interactDist - dist) / interactDist;
-                    // Push away - extremely subtle
-                    this.vx += (dx / dist) * force * 0.005;
-                    this.vy += (dy / dist) * force * 0.005;
+                        // Only attract if under 5 seconds limit
+                        if (this.attractTimer < 5.0) {
+                            // Don't trap completely: if very close (inside or touching), stop pulling
+                            if (dist > 5) { 
+                                const force = (attractRange - dist) / attractRange;
+                                // Gentle pull towards nearest border point
+                                this.vx += (dx / dist) * force * 0.01; // Reduced from 0.03
+                                this.vy += (dy / dist) * force * 0.01;
+                            }
+                        }
+                    } else {
+                        // Reset timer if particle leaves the area
+                        this.attractTimer = 0;
+                    }
                 }
 
-                // 4. Random Wandering (Brownian-like) - Reduced
-                this.vx += (Math.random() - 0.5) * 0.005;
-                this.vy += (Math.random() - 0.5) * 0.005;
+                // 4. Random Wandering (Brownian-like)
+                this.vx += (Math.random() - 0.5) * 0.01;
+                this.vy += (Math.random() - 0.5) * 0.01;
 
-                // Dampen speed to keep them floating gently - Reduced max speed
-                const maxSpeed = 0.2;
+                // Dampen speed
+                const maxSpeed = 0.8; 
                 const speed = Math.sqrt(this.vx * this.vx + this.vy * this.vy);
                 if (speed > maxSpeed) {
                     this.vx = (this.vx / speed) * maxSpeed;
@@ -181,7 +205,7 @@ const NeuralBackground = () => {
             }
 
             // Increased Dust Particles
-            const dustCount = Math.floor((width * height) / 6000); // Higher density
+            const dustCount = Math.floor((width * height) / 4000); // Higher density (was 6000)
             for (let i = 0; i < dustCount; i++) {
                 dustParticles.push(new Dust());
             }

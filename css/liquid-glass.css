@@ -1,0 +1,31 @@
+/* Liquid Glass Effect System - Distortion Logic Only */
+
+/* Base Container */
+.liquid-glass {
+    position: relative;
+    overflow: hidden;
+    isolation: isolate;
+}
+
+/* Common Layer Positioning */
+.liquid-glass-layer {
+    position: absolute;
+    inset: 0;
+    pointer-events: none;
+    border-radius: inherit;
+}
+
+/* Distortion Layer */
+.liquid-glass-distortion {
+    z-index: 0;
+    inset: 0;
+    backdrop-filter: blur(0px);
+    -webkit-backdrop-filter: blur(0px);
+    /* filter: url(...) is applied via inline style in React component */
+}
+
+/* Content Layer */
+.liquid-glass-content {
+    position: relative;
+    z-index: 3;
+}

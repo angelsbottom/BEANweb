@@ -191,14 +191,7 @@ const ExSTEDemo = () => {
             onMouseMove={handleMouseMove}
             onTouchMove={handleTouchMove}
         >
-            {/* Local Filter for Thumb Distortion - Tuned for small size */}
-            <svg style={{ display: 'none' }}>
-                <filter id="thumb-dist-unique" x="-20%" y="-20%" width="140%" height="140%">
-                    <feTurbulence type="fractalNoise" baseFrequency="0.05" numOctaves="2" seed="55" result="noise" />
-                    <feGaussianBlur in="noise" stdDeviation="1.5" result="blurred" />
-                    <feDisplacementMap in="SourceGraphic" in2="blurred" scale="8" xChannelSelector="R" yChannelSelector="G" />
-                </filter>
-            </svg>
+
 
             <style>{`
                 /* Hide Default Range Thumb */
@@ -215,79 +208,6 @@ const ExSTEDemo = () => {
                     height: 24px;
                     cursor: pointer;
                     border: none;
-                }
-                
-                @keyframes liquid-shape {
-                    0% { border-radius: 60% 40% 30% 70% / 60% 30% 70% 40%; }
-                    50% { border-radius: 30% 60% 70% 40% / 50% 60% 30% 60%; }
-                    100% { border-radius: 60% 40% 30% 70% / 60% 30% 70% 40%; }
-                }
-
-                /* Custom Liquid Glass Thumb */
-                .glass-thumb {
-                    position: absolute;
-                    top: 50%;
-                    margin-top: -12px; /* Center vertically */
-                    width: 24px;
-                    height: 24px;
-                    /* Initial irregular shape */
-                    border-radius: 60% 40% 30% 70% / 60% 30% 70% 40%;
-                    pointer-events: none;
-                    transform-origin: center;
-                    transition: transform 0.3s cubic-bezier(0.25, 0.8, 0.25, 1);
-                    
-                    /* Active Orb Style (Magnified Mouse) */
-                    background: rgba(56, 189, 248, 0.05); /* Slight blue tint */
-                    border: 1px solid rgba(56, 189, 248, 0.3); /* Blue border */
-                    /* Added Blur and Glow */
-                    backdrop-filter: blur(2px);
-                    -webkit-backdrop-filter: blur(2px);
-                    box-shadow: 0 0 15px rgba(56, 189, 248, 0.6); /* Blue Bloom Effect */
-                    
-                    /* Fix for edges and rectangular mask */
-                    overflow: hidden;
-                    z-index: 20;
-                    
-                    /* Liquid Shape Animation */
-                    animation: liquid-shape 8s ease-in-out infinite;
-                }
-
-                .thumb-filter {
-                    position: absolute;
-                    inset: -2px; /* Slight overlap */
-                    z-index: 0;
-                    opacity: 1;
-                    /* Liquid Distortion */
-                    backdrop-filter: blur(0px) saturate(1.8) contrast(1.2) brightness(1.1);
-                    -webkit-backdrop-filter: blur(0px) saturate(1.8) contrast(1.2) brightness(1.1);
-                    filter: url(#thumb-dist-unique);
-                }
-
-                @keyframes float-highlight {
-                    0%, 100% {
-                        box-shadow: 
-                            inset 3px 3px 6px rgba(255, 255, 255, 0.9),
-                            inset -3px -3px 6px rgba(56, 189, 248, 0.3),
-                            0 0 10px rgba(56, 189, 248, 0.5),
-                            inset 0 0 15px rgba(56, 189, 248, 0.3);
-                    }
-                    50% {
-                        box-shadow: 
-                            inset 4px 2px 8px rgba(255, 255, 255, 1),
-                            inset -2px -4px 5px rgba(56, 189, 248, 0.4),
-                            0 0 12px rgba(56, 189, 248, 0.6),
-                            inset 0 0 12px rgba(56, 189, 248, 0.4);
-                    }
-                }
-
-                .thumb-specular {
-                    position: absolute;
-                    inset: 0;
-                    z-index: 1;
-                    border-radius: 50%; /* Keep specular circular-ish or match parent? Parent clips it anyway */
-                    opacity: 0.8; 
-                    /* Animated Specular Highlights */
-                    animation: float-highlight 3s ease-in-out infinite;
                 }
             `}</style>
 
@@ -321,18 +241,16 @@ const ExSTEDemo = () => {
                     <div className="absolute left-0 h-1 bg-sky-500 rounded-full z-0 pointer-events-none" style={{ width: `${percent}%` }}></div>
 
                     {/* Custom Liquid Thumb */}
-                    <div 
-                        className="glass-thumb z-10"
+                    <LiquidGlass 
+                        className="liquid-glass-thumb z-10"
                         style={{ 
-                            left: `calc(${percent}% - 12px)`, // Center the 24px thumb
+                            left: `calc(${percent}% - 12px)`, 
                             transform: !isHovering 
-                                ? `scale(${1 + animSpeed * 1.2})` // Scale based on speed (max speed ~0.47 -> scale ~1.56)
+                                ? `scale(${1 + animSpeed * 1.2})` 
                                 : `scale(1)` 
                         }}
-                    >
-                        <div className="thumb-filter"></div>
-                        <div className="thumb-specular"></div>
-                    </div>
+                        filterConfig={{ scale: 8, freq: "0.05" }}
+                    />
                 </div>
 
                 <div className="text-center mt-2">

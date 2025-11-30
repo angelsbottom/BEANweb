@@ -6,6 +6,60 @@ const ExperimentsRevamped = () => {
     const [expandedItem, setExpandedItem] = React.useState(null); // { type, index }
     const [expandedSection, setExpandedSection] = React.useState(null); // 'structural' or 'optimization'
 
+    const tabs = ['imagenet', 'cifar', 'ablation'];
+    const containerRef = React.useRef(null);
+    const [isDragging, setIsDragging] = React.useState(false);
+    const [startX, setStartX] = React.useState(0);
+    const [dragOffset, setDragOffset] = React.useState(0);
+
+    // Drag handlers
+    const handleMouseDown = (e) => {
+        setIsDragging(true);
+        setStartX('touches' in e ? e.touches[0].clientX : e.clientX);
+    };
+
+    React.useEffect(() => {
+        const handleMouseMove = (e) => {
+            if (!isDragging) return;
+            const clientX = 'touches' in e ? e.touches[0].clientX : e.clientX;
+            const delta = clientX - startX;
+            setDragOffset(delta);
+        };
+
+        const handleMouseUp = () => {
+            if (!isDragging) return;
+            setIsDragging(false);
+            
+            // Calculate threshold for switching
+            if (containerRef.current) {
+                const width = containerRef.current.offsetWidth / 3;
+                if (Math.abs(dragOffset) > width / 2) {
+                    const currentIndex = tabs.indexOf(tab);
+                    if (dragOffset > 0 && currentIndex < tabs.length - 1) {
+                        setTab(tabs[currentIndex + 1]);
+                    } else if (dragOffset < 0 && currentIndex > 0) {
+                        setTab(tabs[currentIndex - 1]);
+                    }
+                }
+            }
+            setDragOffset(0);
+        };
+
+        if (isDragging) {
+            window.addEventListener('mousemove', handleMouseMove);
+            window.addEventListener('mouseup', handleMouseUp);
+            window.addEventListener('touchmove', handleMouseMove);
+            window.addEventListener('touchend', handleMouseUp);
+        }
+
+        return () => {
+            window.removeEventListener('mousemove', handleMouseMove);
+            window.removeEventListener('mouseup', handleMouseUp);
+            window.removeEventListener('touchmove', handleMouseMove);
+            window.removeEventListener('touchend', handleMouseUp);
+        };
+    }, [isDragging, startX, dragOffset, tab]);
+
     // Data extracted from Table II
     const imagenetData = {
         'Nano': [
@@ -98,28 +152,97 @@ const ExperimentsRevamped = () => {
                     100% { transform: translateX(250%) skewX(-20deg); }
                 }
                 .animate-shimmer { animation: shimmer 2s cubic-bezier(0.4, 0, 0.2, 1) infinite; }
+
+                @keyframes wiggle {
+                    0%, 100% { transform: rotate(0deg); }
+                    25% { transform: rotate(0.5deg); }
+                    75% { transform: rotate(-0.5deg); }
+                }
+                .animate-wiggle { animation: wiggle 6s ease-in-out infinite; }
             `}</style>
-            <div className="relative flex p-1 bg-white/5 rounded-full self-start backdrop-blur-sm border border-white/10 w-full max-w-md">
-                {/* Liquid Glass Background */}
+            <div 
+                ref={containerRef}
+                className="relative flex p-2 bg-white/5 rounded-full self-center backdrop-blur-sm border border-white/10 w-full max-w-2xl shadow-2xl overflow-hidden"
+            >
+                {/* Buttons (Layer 0 - Under Glass - Always Visible) */}
+                {tabs.map((key, idx) => {
+                    // Calculate opacity based on glass distance to prevent ghosting
+                    let opacity = 1;
+                    if (containerRef.current) {
+                        const width = containerRef.current.offsetWidth / 3;
+                        const currentIdx = tabs.indexOf(tab);
+                        const glassPos = currentIdx * width + dragOffset;
+                        const btnPos = idx * width;
+                        const dist = Math.abs(glassPos - btnPos);
+                        // Hide text when glass is covering it (dist < 40% of width), fade in after
+                        opacity = Math.max(0, Math.min(1, (dist - width * 0.4) / (width * 0.2)));
+                    } else {
+                        // Fallback for initial render
+                        opacity = tab === key ? 0 : 1;
+                    }
+
+                    return (
+                        <button 
+                            key={key} 
+                            onClick={() => !isDragging && setTab(key)} 
+                            className="relative z-0 flex-1 flex items-center justify-center px-6 py-5 rounded-full text-4xl font-tall font-bold tracking-wider uppercase magnetic-target text-gray-500 hover:text-gray-300 antialiased"
+                            style={{ 
+                                opacity,
+                                transition: isDragging ? 'color 300ms ease' : 'opacity 1.5s cubic-bezier(0.23,1,0.32,1), color 300ms ease',
+                                backfaceVisibility: 'hidden'
+                            }}
+                        >
+                            {key}
+                        </button>
+                    );
+                })}
+
+                {/* Liquid Glass Background (Layer 10 - Overlay) */}
                 <div 
-                    className="absolute top-1 bottom-1 rounded-full bg-sky-600 shadow-[0_0_15px_rgba(14,165,233,0.5)] transition-all duration-500 ease-[cubic-bezier(0.23,1,0.32,1)] backdrop-blur-md"
+                    className={`absolute top-2 bottom-2 z-10 rounded-full ${isDragging ? 'cursor-grabbing' : 'cursor-grab'}`}
+                    onMouseDown={handleMouseDown}
+                    onTouchStart={handleMouseDown}
                     style={{
-                        width: 'calc((100% - 8px) / 3)',
-                        left: tab === 'imagenet' ? '4px' : tab === 'cifar' ? 'calc(4px + (100% - 8px) / 3)' : 'calc(4px + 2 * (100% - 8px) / 3)',
+                        width: 'calc((100% - 16px) / 3)',
+                        left: tab === 'imagenet' ? '8px' : tab === 'cifar' ? 'calc(8px + (100% - 16px) / 3)' : 'calc(8px + 2 * (100% - 16px) / 3)',
+                        transform: isDragging ? `translateX(${dragOffset}px)` : 'none',
+                        transition: isDragging ? 'none' : 'all 1.5s cubic-bezier(0.23,1,0.32,1)',
+                        backfaceVisibility: 'hidden',
+                        perspective: '1000px',
+                        WebkitFontSmoothing: 'antialiased'
                     }}
                 >
-                    <div className="absolute inset-0 bg-gradient-to-tr from-white/20 to-transparent rounded-full"></div>
-                </div>
-
-                {['imagenet', 'cifar', 'ablation'].map((key, idx) => (
-                    <button 
-                        key={key} 
-                        onClick={()=>setTab(key)} 
-                        className={`relative z-10 flex-1 flex items-center justify-center px-6 py-2 rounded-full text-sm font-bold uppercase transition-colors duration-300 magnetic-target ${tab===key ? 'text-white text-shadow-sm' : 'text-gray-400 hover:text-white'}`}
+                    <LiquidGlass 
+                        className={`w-full h-full rounded-full ${!isDragging ? 'animate-wiggle' : ''}`}
+                        overlayStyle={{ 
+                            background: tab === 'imagenet' ? 'rgba(14, 165, 233, 0.3)' : 
+                                       tab === 'cifar' ? 'rgba(168, 85, 247, 0.3)' : 
+                                       'rgba(239, 68, 68, 0.3)' 
+                        }}
+                        filterConfig={{ scale: 40, freq: "0.001 0.001" }}
+                        distortContent={true}
+                        contentClassName="!p-0 w-full h-full relative"
                     >
-                        {key}
-                    </button>
-                ))}
+                        {/* Stationary Distorted Layer: Moves opposite to the pill to appear fixed */}
+                        <div 
+                            className="flex h-full items-center absolute top-0"
+                            style={{ 
+                                width: 'calc(300% + 16px)', 
+                                left: tab === 'imagenet' ? '-8px' : tab === 'cifar' ? 'calc(-8px - 100%)' : 'calc(-8px - 200%)',
+                                transform: isDragging ? `translateX(${-dragOffset}px)` : 'none',
+                                transition: isDragging ? 'none' : 'left 1.5s cubic-bezier(0.23,1,0.32,1), transform 1.5s cubic-bezier(0.23,1,0.32,1)'
+                            }}
+                        >
+                             {tabs.map((key) => (
+                                <div key={key} className="flex-1 flex items-center justify-center">
+                                    <span className="text-4xl font-tall font-bold tracking-wider uppercase text-white opacity-90 antialiased">
+                                        {key}
+                                    </span>
+                                </div>
+                            ))}
+                        </div>
+                    </LiquidGlass>
+                </div>
             </div>
             
             <div key={tab} className="w-full bg-black/20 border border-white/5 rounded-2xl p-6 relative animate-slide-in-up">
@@ -224,29 +347,34 @@ const ExperimentsRevamped = () => {
                         
                         {/* Section 1: Structural Dependencies */}
                         {/* Section 1: Structural Dependencies */}
-                        <div className="flex flex-col bg-white/5 rounded-2xl border border-white/5 overflow-hidden shrink-0 animate-fade-in-up" style={{animationDelay: '100ms'}}>
+                        <div className="flex flex-col bg-white/5 rounded-2xl border border-white/5 overflow-hidden shrink-0 animate-fade-in-up transition-all duration-700 ease-[cubic-bezier(0.23,1,0.32,1)]" style={{animationDelay: '100ms'}}>
                             {/* Section Header */}
                             <button 
-                                onClick={() => setExpandedSection(expandedSection === 'structural' ? null : 'structural')}
-                                className="flex items-center justify-between p-4 w-full text-left hover:bg-white/5 transition-colors magnetic-target"
+                                onClick={() => {
+                                    setExpandedSection(expandedSection === 'structural' ? null : 'structural');
+                                    setExpandedItem(null); // Reset expanded item when toggling section
+                                }}
+                                className={`flex items-center justify-between p-4 w-full text-left transition-all duration-500 magnetic-target group
+                                    ${expandedSection === 'structural' ? 'bg-white/5' : 'hover:bg-white/5'}
+                                `}
                             >
-                                <div className="flex items-center gap-3">
-                                    <div className="p-2 bg-red-500/10 rounded-lg border border-red-500/30">
-                                        <Icons.Layers size={18} className="text-red-400" />
+                                <div className="flex items-center gap-4">
+                                    <div className={`p-2.5 rounded-xl border transition-all duration-500 ${expandedSection === 'structural' ? 'bg-red-500 text-white border-red-400 shadow-[0_0_15px_rgba(239,68,68,0.4)]' : 'bg-red-500/10 border-red-500/30 text-red-400'}`}>
+                                        <Icons.Layers size={20} />
                                     </div>
                                     <div>
-                                        <h3 className="text-sm font-bold text-white tracking-wider uppercase">Structural Dependencies</h3>
-                                        <p className="text-[10px] text-red-300/70 font-mono">COMPONENT CRITICALITY ANALYSIS</p>
+                                        <h3 className={`text-sm font-bold tracking-wider uppercase transition-colors duration-300 ${expandedSection === 'structural' ? 'text-white' : 'text-gray-300 group-hover:text-white'}`}>Structural Dependencies</h3>
+                                        <p className="text-[10px] text-red-300/70 font-mono mt-0.5">COMPONENT CRITICALITY ANALYSIS</p>
                                     </div>
                                 </div>
-                                <div className={`transform transition-transform duration-300 ${expandedSection === 'structural' ? 'rotate-180' : ''}`}>
-                                    <Icons.ChevronDown className="text-gray-400" />
+                                <div className={`w-8 h-8 rounded-full flex items-center justify-center border border-white/10 transition-all duration-500 ${expandedSection === 'structural' ? 'bg-white text-black rotate-180' : 'bg-black/20 text-gray-400'}`}>
+                                    <Icons.ChevronDown size={14} />
                                 </div>
                             </button>
 
                             {/* Section Content */}
                             <div className={`transition-all duration-700 ease-[cubic-bezier(0.23,1,0.32,1)] overflow-hidden ${expandedSection === 'structural' ? 'max-h-[800px] opacity-100' : 'max-h-0 opacity-0'}`}>
-                                <div className="p-4 pt-0 space-y-2">
+                                <div className="p-4 pt-2 space-y-2 border-t border-white/5">
                                     {componentImpact.map((item, idx) => {
                                         const isExpanded = expandedItem?.type === 'structural' && expandedItem?.index === idx;
                                         const isDimmed = expandedItem && !isExpanded;
@@ -256,9 +384,9 @@ const ExperimentsRevamped = () => {
                                             <div 
                                                 key={idx} 
                                                 onClick={() => setExpandedItem(isExpanded ? null : {type: 'structural', index: idx})}
-                                                className={`relative rounded-xl border transition-all duration-[1000ms] ease-[cubic-bezier(0.23,1,0.32,1)] cursor-pointer magnetic-target group/item overflow-hidden
-                                                    ${isExpanded ? 'h-40 bg-red-950/30 border-red-500/50 shadow-[0_0_30px_rgba(220,38,38,0.15)] z-10 scale-[1.02] my-4' : 'h-14 bg-black/40 border-white/5 hover:bg-white/5 hover:border-white/10'}
-                                                    ${isDimmed ? 'opacity-30 grayscale scale-95 blur-[1px]' : 'opacity-100'}
+                                                className={`relative rounded-xl border transition-all duration-[800ms] ease-[cubic-bezier(0.23,1,0.32,1)] cursor-pointer magnetic-target group/item overflow-hidden
+                                                    ${isExpanded ? 'h-36 bg-red-950/40 border-red-500/50 shadow-[0_0_30px_rgba(220,38,38,0.15)] z-10 scale-[1.02] my-3' : 'h-12 bg-black/20 border-white/5 hover:bg-white/5 hover:border-white/10'}
+                                                    ${isDimmed ? 'opacity-40 grayscale scale-[0.98] blur-[0.5px]' : 'opacity-100'}
                                                 `}
                                             >
                                                 {/* Shimmer Effect */}
@@ -274,37 +402,32 @@ const ExperimentsRevamped = () => {
                                                     style={{ width: isExpanded ? '100%' : `${intensity * 100}%` }}
                                                 ></div>
 
-                                                <div className="relative z-10 p-3 h-full flex flex-col">
-                                                    <div className="flex justify-between items-center">
-                                                        <div className="flex flex-col">
-                                                            <span className={`font-bold transition-all duration-500 ${isExpanded ? 'text-lg text-white' : 'text-xs text-gray-200'}`}>
+                                                <div className="relative z-10 px-4 py-3 h-full flex flex-col justify-between">
+                                                    <div className="flex justify-between items-center w-full">
+                                                        <div className="flex flex-col justify-center h-6">
+                                                            <span className={`font-bold transition-all duration-500 ${isExpanded ? 'text-base text-white translate-y-0' : 'text-xs text-gray-300 group-hover/item:text-white'}`}>
                                                                 {item.name}
                                                             </span>
+                                                        </div>
+
+                                                        <div className="flex items-center gap-3">
                                                             {!isExpanded && (
-                                                                <span className="text-[9px] text-gray-500 font-mono mt-0.5 flex items-center gap-1">
-                                                                    <div className="w-1 h-1 rounded-full bg-red-500"></div>
+                                                                <span className="text-[9px] text-gray-500 font-mono opacity-0 group-hover/item:opacity-100 transition-opacity duration-300">
                                                                     {item.desc}
                                                                 </span>
                                                             )}
-                                                        </div>
-
-                                                        <div className="flex flex-col items-end">
-                                                            <span className={`font-mono font-black text-red-400 transition-all duration-500 ${isExpanded ? 'text-2xl drop-shadow-[0_0_10px_rgba(248,113,113,0.5)]' : 'text-sm'}`}>
+                                                            <span className={`font-mono font-black text-red-400 transition-all duration-500 ${isExpanded ? 'text-2xl drop-shadow-[0_0_10px_rgba(248,113,113,0.5)]' : 'text-xs'}`}>
                                                                 {item.delta}%
                                                             </span>
                                                         </div>
                                                     </div>
 
                                                     {/* Expanded Content */}
-                                                    <div className={`mt-4 space-y-3 transition-all duration-700 delay-100 ${isExpanded ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-4 pointer-events-none'}`}>
-                                                        <div className="text-xs text-gray-300 leading-relaxed border-l-2 border-red-500/50 pl-3">
+                                                    <div className={`transition-all duration-500 delay-75 flex flex-col gap-3 ${isExpanded ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-4 pointer-events-none absolute bottom-0'}`}>
+                                                        <div className="w-full h-px bg-gradient-to-r from-red-500/50 to-transparent"></div>
+                                                        <div className="text-xs text-gray-300 leading-relaxed">
+                                                            <span className="text-red-400 font-bold mr-1">Analysis:</span>
                                                             {item.desc}. Removing or altering this component results in a significant performance drop, highlighting its critical role in the BEANet architecture.
-                                                        </div>
-                                                        <div className="flex items-center gap-2">
-                                                            <div className="text-[10px] font-mono text-gray-500 uppercase">Impact Level</div>
-                                                            <div className="flex-1 h-1.5 bg-gray-800 rounded-full overflow-hidden">
-                                                                <div className="h-full bg-gradient-to-r from-red-600 to-red-400" style={{width: `${intensity*100}%`}}></div>
-                                                            </div>
                                                         </div>
                                                     </div>
                                                 </div>
@@ -316,32 +439,36 @@ const ExperimentsRevamped = () => {
                         </div>
 
                         {/* Section 2: Optimization Trajectory */}
-                        {/* Section 2: Optimization Trajectory */}
-                        <div className="flex flex-col bg-white/5 rounded-2xl border border-white/5 overflow-hidden shrink-0 animate-fade-in-up" style={{animationDelay: '200ms'}}>
+                        <div className="flex flex-col bg-white/5 rounded-2xl border border-white/5 overflow-hidden shrink-0 animate-fade-in-up transition-all duration-700 ease-[cubic-bezier(0.23,1,0.32,1)]" style={{animationDelay: '200ms'}}>
                             {/* Section Header */}
                             <button 
-                                onClick={() => setExpandedSection(expandedSection === 'optimization' ? null : 'optimization')}
-                                className="flex items-center justify-between p-4 w-full text-left hover:bg-white/5 transition-colors magnetic-target"
+                                onClick={() => {
+                                    setExpandedSection(expandedSection === 'optimization' ? null : 'optimization');
+                                    setExpandedItem(null); // Reset expanded item when toggling section
+                                }}
+                                className={`flex items-center justify-between p-4 w-full text-left transition-all duration-500 magnetic-target group
+                                    ${expandedSection === 'optimization' ? 'bg-white/5' : 'hover:bg-white/5'}
+                                `}
                             >
-                                <div className="flex items-center gap-3">
-                                    <div className="p-2 bg-green-500/10 rounded-lg border border-green-500/30">
-                                        <Icons.TrendingUp size={18} className="text-green-400" />
+                                <div className="flex items-center gap-4">
+                                    <div className={`p-2.5 rounded-xl border transition-all duration-500 ${expandedSection === 'optimization' ? 'bg-green-500 text-white border-green-400 shadow-[0_0_15px_rgba(34,197,94,0.4)]' : 'bg-green-500/10 border-green-500/30 text-green-400'}`}>
+                                        <Icons.TrendingUp size={20} />
                                     </div>
                                     <div>
-                                        <h3 className="text-sm font-bold text-white tracking-wider uppercase">Optimization Trajectory</h3>
-                                        <p className="text-[10px] text-green-300/70 font-mono">ACCURACY EVOLUTION LOG</p>
+                                        <h3 className={`text-sm font-bold tracking-wider uppercase transition-colors duration-300 ${expandedSection === 'optimization' ? 'text-white' : 'text-gray-300 group-hover:text-white'}`}>Optimization Trajectory</h3>
+                                        <p className="text-[10px] text-green-300/70 font-mono mt-0.5">ACCURACY EVOLUTION LOG</p>
                                     </div>
                                 </div>
-                                <div className={`transform transition-transform duration-300 ${expandedSection === 'optimization' ? 'rotate-180' : ''}`}>
-                                    <Icons.ChevronDown className="text-gray-400" />
+                                <div className={`w-8 h-8 rounded-full flex items-center justify-center border border-white/10 transition-all duration-500 ${expandedSection === 'optimization' ? 'bg-white text-black rotate-180' : 'bg-black/20 text-gray-400'}`}>
+                                    <Icons.ChevronDown size={14} />
                                 </div>
                             </button>
 
                             {/* Section Content */}
                             <div className={`transition-all duration-700 ease-[cubic-bezier(0.23,1,0.32,1)] overflow-hidden ${expandedSection === 'optimization' ? 'max-h-[800px] opacity-100' : 'max-h-0 opacity-0'}`}>
-                                <div className="p-4 pt-0 pl-8 relative space-y-4">
+                                <div className="p-4 pt-2 pl-8 relative space-y-3 border-t border-white/5">
                                     {/* Continuous Line */}
-                                    <div className="absolute left-[27px] top-0 bottom-8 w-0.5 bg-gray-800 rounded-full overflow-hidden">
+                                    <div className="absolute left-[43px] top-4 bottom-8 w-0.5 bg-gray-800 rounded-full overflow-hidden">
                                         <div className="absolute top-0 left-0 w-full bg-gradient-to-b from-green-500/20 via-green-400 to-green-500 animate-[flow-dash_3s_linear_infinite] h-[200%]"></div>
                                     </div>
 
@@ -355,41 +482,42 @@ const ExperimentsRevamped = () => {
                                                 key={idx} 
                                                 onClick={() => setExpandedItem(isExpanded ? null : {type: 'optimization', index: idx})}
                                                 className={`relative flex items-start gap-4 group cursor-pointer magnetic-target transition-all duration-500
-                                                    ${isDimmed ? 'opacity-30 grayscale blur-[1px]' : 'opacity-100'}
+                                                    ${isDimmed ? 'opacity-40 grayscale blur-[0.5px]' : 'opacity-100'}
                                                 `}
                                             >
                                                 {/* Node */}
                                                 <div className={`relative z-10 w-6 h-6 shrink-0 rounded-full flex items-center justify-center border-2 transition-all duration-500 mt-3
                                                     ${isLast ? 'bg-green-500 border-white shadow-[0_0_15px_#22c55e]' : 'bg-gray-900 border-green-500/30 group-hover:border-green-400'}
-                                                    ${isExpanded ? 'scale-125 border-white' : ''}
+                                                    ${isExpanded ? 'scale-125 border-white shadow-[0_0_20px_rgba(34,197,94,0.6)]' : ''}
                                                 `}>
                                                     <div className={`w-2 h-2 rounded-full ${isLast ? 'bg-white animate-pulse' : 'bg-green-500'}`}></div>
                                                 </div>
 
                                                 {/* Card */}
                                                 <div className={`flex-1 rounded-xl border backdrop-blur-sm transition-all duration-700 ease-[cubic-bezier(0.23,1,0.32,1)] overflow-hidden
-                                                    ${isExpanded ? 'h-32 bg-green-900/20 border-green-500/50 shadow-[0_0_20px_rgba(34,197,94,0.1)]' : 'h-12 bg-white/5 border-white/5 hover:bg-white/10'}
-                                                    ${isLast && !isExpanded ? 'bg-green-500/10 border-green-500/30' : ''}
+                                                    ${isExpanded ? 'h-28 bg-green-900/30 border-green-500/50 shadow-[0_0_20px_rgba(34,197,94,0.15)]' : 'h-12 bg-black/20 border-white/5 hover:bg-white/5 hover:border-white/10'}
+                                                    ${isLast && !isExpanded ? 'bg-green-500/5 border-green-500/20' : ''}
                                                 `}>
-                                                    <div className="p-3 h-full flex flex-col">
+                                                    <div className="px-4 py-3 h-full flex flex-col justify-between">
                                                         <div className="flex justify-between items-center">
-                                                            <div className={`font-bold transition-all ${isExpanded ? 'text-base text-white' : 'text-xs text-gray-300'}`}>
+                                                            <div className={`font-bold transition-all duration-500 ${isExpanded ? 'text-base text-white' : 'text-xs text-gray-300'}`}>
                                                                 {step.name}
                                                             </div>
-                                                            <div className={`font-mono font-black transition-all ${isExpanded ? 'text-xl text-green-400' : 'text-sm text-gray-400'}`}>
+                                                            <div className={`font-mono font-black transition-all duration-500 ${isExpanded ? 'text-xl text-green-400 drop-shadow-[0_0_8px_rgba(74,222,128,0.5)]' : 'text-sm text-gray-400'}`}>
                                                                 {step.val}%
                                                             </div>
                                                         </div>
 
                                                         {/* Expanded Content */}
-                                                        <div className={`mt-3 space-y-2 transition-all duration-500 ${isExpanded ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-4 pointer-events-none'}`}>
-                                                            <div className="flex justify-between text-[10px] text-gray-400 font-mono uppercase">
-                                                                <span>Contribution</span>
-                                                                <span className="text-green-400">+{step.delta}%</span>
+                                                        <div className={`transition-all duration-500 delay-75 flex flex-col gap-2 ${isExpanded ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-4 pointer-events-none absolute bottom-0'}`}>
+                                                            <div className="w-full h-px bg-gradient-to-r from-green-500/50 to-transparent"></div>
+                                                            <div className="flex justify-between items-center text-xs">
+                                                                <span className="text-gray-400">Contribution:</span>
+                                                                <span className="text-green-400 font-bold">+{step.delta}%</span>
                                                             </div>
                                                             <div className="w-full h-1.5 bg-gray-800 rounded-full overflow-hidden">
                                                                 <div 
-                                                                    className="h-full bg-gradient-to-r from-green-600 to-green-400"
+                                                                    className="h-full bg-gradient-to-r from-green-600 to-green-400 shadow-[0_0_10px_rgba(34,197,94,0.5)]"
                                                                     style={{ width: `${((step.val - 60) / 20) * 100}%` }}
                                                                 ></div>
                                                             </div>

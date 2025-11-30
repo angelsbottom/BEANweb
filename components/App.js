@@ -189,31 +189,54 @@ const useScale = () => {
                 const s = window.innerWidth / 1440;
                 setScale(s);
 
-                // Calculate visual scale to fit height
                 // Calculate visual scale to fit height (fill vertical space)
                 const effectiveH = window.innerHeight / s;
-                const targetBaseH = 680;
+                const targetBaseH = 680; // Base height of visual content
+                const baseVisualWidth = 907; // Base width (approx 4/3 of 680)
 
-                // Dynamic scale to fill height (including top bar area)
-                let vScale = effectiveH / targetBaseH;
+                // 1. Calculate ideal scale to fill height
+                // We subtract a small buffer (e.g. 40px) for margins/padding if needed, 
+                // but user said "fill right side", so we aim for full height.
+                let idealVScale = effectiveH / targetBaseH;
 
-                // Constraint: Text width >= 30%, Font size not too small.
-                // Otherwise reduce demonstration box (visualScale).
+                // 2. Calculate required width at this scale
+                const reqWidth = baseVisualWidth * idealVScale;
 
-                // We fix text width to 30% to maximize visual space while respecting the limit.
-                const safeTextWidth = 30;
-                setTextWidth(safeTextWidth);
+                // 3. Calculate remaining width for text
+                const availTextWidth = 1440 - reqWidth;
+                let textWidthPercent = (availTextWidth / 1440) * 100;
 
-                // Calculate visual scale. 
-                // Since Visual Component is anchored right and takes 100% of remaining width,
-                // any scale > 1 would cause overlap with the text area.
-                // Therefore, we cap visualScale at 1.0.
-                let actualVisualScale = Math.min(vScale * 0.94, 1);
-                setVisualScale(actualVisualScale);
+                // 4. Check constraints (Text compressed?)
+                const minTextWidthPercent = 30; // Minimum 30% width for text
+                
+                let finalVScale = idealVScale;
+                let finalTextWidth = textWidthPercent;
 
-                // Text Scale: Ideally matches visual scale, but with a minimum floor.
-                // We use 0.75 as the minimum readable scale.
-                setTextScale(Math.max(actualVisualScale, 0.75));
+                if (textWidthPercent < minTextWidthPercent) {
+                    // Text is too compressed, clamp it
+                    finalTextWidth = minTextWidthPercent;
+                    
+                    // Recalculate max allowed visual scale
+                    const maxAvailVisualWidth = 1440 * (1 - (minTextWidthPercent / 100));
+                    // Add a small buffer to prevent exact edge touching/rounding errors
+                    const safeAvailWidth = maxAvailVisualWidth - 20; 
+                    finalVScale = safeAvailWidth / baseVisualWidth;
+                }
+
+                // Apply values
+                // Ensure text width isn't too large either (e.g. on very short screens)
+                // If screen is very short, idealVScale is small, reqWidth is small, textWidth becomes huge.
+                // We might want to cap text width at say 50%?
+                if (finalTextWidth > 50) finalTextWidth = 50;
+
+                setTextWidth(finalTextWidth);
+                
+                // User Request: Reduce overall landscape visual scale by 5%
+                const reducedScale = finalVScale * 0.95;
+                setVisualScale(reducedScale);
+
+                // Text Scale: Match visual scale but with floor
+                setTextScale(Math.max(reducedScale, 0.75));
             }
         };
         window.addEventListener('resize', handleResize);
@@ -309,15 +332,14 @@ const App = () => {
                             style={isLandscape ? { width: `${textWidth}%`, transform: `scale(${textScale})`, transformOrigin: 'top left' } : {}}
                         >
                             <div className={`transition-all duration-700 transform ${anim ? 'opacity-0 -translate-y-8' : 'opacity-100 translate-y-0'}`}>
-                                <div className="glass-capsule mb-6">
-                                    <div className="glass-filter"></div>
-                                    <div className="glass-overlay" style={{ background: 'rgba(14, 165, 233, 0.1)' }}></div>
-                                    <div className="glass-specular"></div>
-                                    <div className="glass-content gap-2">
-                                        <span className="w-1.5 h-1.5 rounded-full bg-sky-400 animate-pulse"></span>
-                                        <span className="text-sky-300 text-xs font-bold tracking-widest">SECTION 0{curr + 1}</span>
+                                <LiquidGlass 
+                                    className="liquid-glass-capsule mb-6 !py-0 !px-4" 
+                                    overlayStyle={{ background: 'rgba(14, 165, 233, 0.1)' }}
+                                >
+                                    <div className="flex items-center justify-center gap-3">
+                                        <span className="text-sky-300 text-4xl font-light tracking-wide font-tall leading-none pb-1">SECTION 0{curr + 1}</span>
                                     </div>
-                                </div>
+                                </LiquidGlass>
                                 <h1 className={`${isLandscape ? 'text-4xl' : 'text-2xl'} font-black text-white mb-4 leading-tight`}>{pages[curr].title}</h1>
                                 <h2 className="text-lg font-light text-gray-400 mb-6 font-mono">{pages[curr].subtitle}</h2>
                                 <div className="pointer-events-auto leading-relaxed opacity-90">{pages[curr].content}</div>
@@ -337,7 +359,7 @@ const App = () => {
                                     backgroundColor: 'rgba(20, 20, 30, 0.4)',
                                     transform: isLandscape ? `scale(${visualScale})` : `scale(${mobileScale})`,
                                     transformOrigin: isLandscape ? 'top right' : 'top center',
-                                    width: (!isLandscape && mobileScale < 1) ? `${MOBILE_TARGET_WIDTH}px` : '100%'
+                                    width: isLandscape ? '907px' : (mobileScale < 1 ? `${MOBILE_TARGET_WIDTH}px` : '100%')
                                 }}
                             >
                                 <div className={`w-full flex-1 relative flex flex-col rounded-2xl`}>
@@ -350,14 +372,7 @@ const App = () => {
                         </div>
                     </div>
 
-                    {/* SVG Filter for Liquid Glass */}
-                    <svg style={{ display: 'none' }}>
-                        <filter id="lg-dist" x="0%" y="0%" width="100%" height="100%">
-                            <feTurbulence type="fractalNoise" baseFrequency="0.008 0.008" numOctaves="2" seed="92" result="noise" />
-                            <feGaussianBlur in="noise" stdDeviation="2" result="blurred" />
-                            <feDisplacementMap in="SourceGraphic" in2="blurred" scale="70" xChannelSelector="R" yChannelSelector="G" />
-                        </filter>
-                    </svg>
+
 
 
                 </div>
@@ -371,85 +386,25 @@ const App = () => {
                     transformOrigin: 'bottom right'
                 }}
             >
-                <style>{`
-                    .glass-btn {
-                        position: relative;
-                        display: flex;
-                        align-items: center;
-                        justify-content: center;
-                        width: 5rem;
-                        height: 5rem;
-                        border-radius: 9999px;
-                        overflow: hidden;
-                        cursor: pointer;
-                        transition: all 0.4s cubic-bezier(0.175, 0.885, 0.32, 2.2);
-                        box-shadow: 0 6px 6px rgba(0, 0, 0, 0.2), 0 0 20px rgba(0, 0, 0, 0.1);
-                    }
-                    .glass-capsule {
-                        position: relative;
-                        display: inline-flex;
-                        align-items: center;
-                        justify-content: center;
-                        padding: 0.5rem 1.5rem;
-                        border-radius: 9999px;
-                        overflow: hidden;
-                        box-shadow: 0 4px 10px rgba(0, 0, 0, 0.1);
-                    }
-                    .glass-btn:hover {
-                        transform: scale(1.1);
-                    }
-                    .glass-btn:disabled {
-                        opacity: 0;
-                        pointer-events: none;
-                    }
-                    .glass-filter {
-                        position: absolute;
-                        inset: 0;
-                        z-index: 0;
-                        backdrop-filter: blur(0px);
-                        filter: url(#lg-dist);
-                        isolation: isolate;
-                    }
-                    .glass-overlay {
-                        position: absolute;
-                        inset: 0;
-                        z-index: 1;
-                        background: rgba(255, 255, 255, 0.1);
-                    }
-                    .glass-specular {
-                        position: absolute;
-                        inset: 0;
-                        z-index: 2;
-                        border-radius: inherit;
-                        overflow: hidden;
-                        box-shadow: inset 1px 1px 0 rgba(255, 255, 255, 0.4), inset 0 0 5px rgba(255, 255, 255, 0.4);
-                    }
-                    .glass-content {
-                        position: relative;
-                        z-index: 3;
-                        display: flex;
-                        align-items: center;
-                        justify-content: center;
-                    }
-                `}</style>
 
-                <button onClick={() => go(curr - 1)} disabled={curr === 0} className="glass-btn magnetic-target group">
-                    <div className="glass-filter"></div>
-                    <div className="glass-overlay"></div>
-                    <div className="glass-specular"></div>
-                    <div className="glass-content">
-                        <Icons.ArrowLeft className="text-white group-hover:-translate-x-1 transition-transform" />
-                    </div>
-                </button>
 
-                <button onClick={() => go(curr + 1)} disabled={curr === pages.length - 1} className="glass-btn magnetic-target group">
-                    <div className="glass-filter"></div>
-                    <div className="glass-overlay"></div>
-                    <div className="glass-specular"></div>
-                    <div className="glass-content">
-                        <Icons.ArrowRight className="text-white group-hover:translate-x-1 transition-transform" />
-                    </div>
-                </button>
+                <LiquidGlass 
+                    as="button"
+                    onClick={() => go(curr - 1)} 
+                    disabled={curr === 0} 
+                    className="liquid-glass-btn w-20 h-20 rounded-full magnetic-target group disabled:opacity-0 disabled:pointer-events-none flex items-center justify-center"
+                >
+                    <Icons.ArrowLeft className="text-white w-10 h-10 group-hover:-translate-x-1 transition-transform" />
+                </LiquidGlass>
+
+                <LiquidGlass 
+                    as="button"
+                    onClick={() => go(curr + 1)} 
+                    disabled={curr === pages.length - 1} 
+                    className="liquid-glass-btn w-20 h-20 rounded-full magnetic-target group disabled:opacity-0 disabled:pointer-events-none flex items-center justify-center"
+                >
+                    <Icons.ArrowRight className="text-white w-10 h-10 group-hover:translate-x-1 transition-transform" />
+                </LiquidGlass>
             </div>
         </>
     );

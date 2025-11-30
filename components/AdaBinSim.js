@@ -439,14 +439,13 @@ const AdaBinSim = ({ isActive }) => {
                         <button onClick={() => switchMethod('adabin')} className={`relative z-10 w-32 h-16 rounded-[1.5rem] text-xl font-black tracking-wide transition-all duration-300 ${activeTab==='adabin'?'text-sky-400 drop-shadow-[0_0_8px_rgba(56,189,248,0.8)]':'text-gray-500 hover:text-sky-400/50'}`}>Adaptive</button>
                         <button onClick={() => switchMethod('optimized')} className={`relative z-10 w-32 h-16 rounded-[1.5rem] text-xl font-black tracking-wide transition-all duration-300 ${activeTab==='optimized'?'text-green-400 drop-shadow-[0_0_8px_rgba(74,222,128,0.8)]':'text-gray-500 hover:text-green-400/50'}`}>Optimized</button>
                     </div>
-                    <button onClick={generateParticles} className="glass-btn magnetic-target group absolute bottom-[5.5rem] left-2 rounded-full" style={{ width: '5rem', height: '5rem' }}>
-                        <div className="glass-filter rounded-full"></div>
-                        <div className="glass-overlay rounded-full"></div>
-                        <div className="glass-specular rounded-full"></div>
-                        <div className="glass-content">
-                            <Icons.Refresh className="w-8 h-8 text-white group-hover:rotate-180 transition-transform duration-700"/>
-                        </div>
-                    </button>
+                    <LiquidGlass 
+                        as="button"
+                        onClick={generateParticles} 
+                        className="liquid-glass-btn magnetic-target group absolute bottom-[5.5rem] left-2 rounded-full w-20 h-20"
+                    >
+                        <Icons.Refresh className="w-8 h-8 text-white group-hover:rotate-180 transition-transform duration-700"/>
+                    </LiquidGlass>
                 </div>
                 <div className="text-[10px] text-gray-500 font-mono">
                     Quantization Error = Σ (Full_Precision - Binary_Reconstruction)²
